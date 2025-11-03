@@ -3,11 +3,11 @@ from torch.utils.data import DataLoader
 from diffusers import AutoencoderKL, UNet2DConditionModel
 from tqdm import tqdm
 from helpers import sinusoidalEmbedding
-from dataset import ToyShadowDataset # my dataset
+from dataset import ToyShadowDataset3D # my dataset
 
 # ---- config ----
 BATCH_SIZE = 2
-EPOCHS = 100
+EPOCHS = 30
 NUM_WORKERS = 2
 ####
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -32,7 +32,7 @@ def main():
     mse = nn.MSELoss()
 
     loader = DataLoader(
-        ToyShadowDataset(n=2000, size=128),
+        ToyShadowDataset3D(n=2000, size=128),
         batch_size=BATCH_SIZE,
         shuffle=True,
         num_workers=NUM_WORKERS
@@ -53,11 +53,11 @@ def main():
 
             # random noise and interpolation
             noise = torch.randn_like(Zshw)
-            factor = torch.rand(Zshw.shape[0],1,1,1, device=device)
-            latent = factor*noise + (1-factor)*Zshw
+            t = torch.rand(Zshw.shape[0],1,1,1, device=device)
+            latent = t*noise + (1-t)*Zshw # parameterized eqn
 
             # concatenate conditioning channels (2c+1)
-            Zin = torch.cat([latent, Zobj, Zmsk], dim=1)
+            Zin = torch.cat([latent, Zobj, Zmsk], dim=1) # latent space input
 
             # embed light parameters
             embed = torch.cat([
@@ -69,13 +69,15 @@ def main():
 
             # forward pass
             pred = uNet(sample=Zin,
-                        timestep = (factor[:,0,0,0]*1000).long(),
+                        timestep = (t[:,0,0,0]*1000).long(),
                         encoder_hidden_states = embed.unsqueeze(1)).sample
         
-            target = noise - Zshw
+            target = noise - Zshw # rectified flow objective
             loss = mse(pred, target)
 
-            optimizer.zero_grad(); loss.backward(); optimizer.step()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
         print(f"Epoch {epoch} || Loss: {loss.item():.4f}")
         torch.save(uNet.state_dict(), f"toyJasperE{epoch}.pth")
