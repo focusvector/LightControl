@@ -1,0 +1,8 @@
+# Ignore model weight files
+*.pth
+
+# Editor settings
+.vscode/
+
+# Generated renders
+blendify/output/
