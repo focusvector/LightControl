@@ -32,7 +32,7 @@ from mathutils import Vector
 LIGHT_RADIUS = 8.0          # r from the paper (sphere radius)
 IMG_RES = 1024              # output image resolution
 MASK_MAT_NAME = "_MaskMat"  # special white material for binary mask
-VARIATIONS_PER_MODEL = 1   # set to 1 for a single render per model
+VARIATIONS_PER_MODEL = 2 # set to 1 for a single render per model
 
 
 # ------------------------------------------------------------
@@ -286,21 +286,38 @@ def render_sample(model_path, output_dir, samples, idx):
     for m in orig_mats:
         obj.data.materials.append(m)
 
-    # Shadow render
+    # ---------------- Shadow Render ----------------
+    # Make sure the ground plane catches shadows
     plane.cycles.is_shadow_catcher = True
     plane.hide_render = False
     bpy.context.view_layer.cycles.use_pass_shadow_catcher = True
+
+    # --- Store previous visibility settings ---
+    prev_vis = {}
+    for prop in [
+        "visible_camera", "visible_diffuse",
+        "visible_glossy", "visible_transmission", "visible_shadow"
+    ]:
+        if hasattr(obj, prop):
+            prev_vis[prop] = getattr(obj, prop)
+
+    # --- Hide object from camera but keep its shadow/reflection ---
+    if hasattr(obj, "visible_camera"):
+        obj.visible_camera = False
+    if hasattr(obj, "visible_diffuse"):
+        obj.visible_diffuse = True
+    if hasattr(obj, "visible_glossy"):
+        obj.visible_glossy = True
+    if hasattr(obj, "visible_shadow"):
+        obj.visible_shadow = True
+
+    # Render the pure shadow pass (object invisible but shadow visible)
     render(bpy.context.scene, shadow_path)
 
-    return {
-        "model": os.path.basename(model_path),
-        "theta": theta,
-        "phi": phi,
-        "size": size,
-        "rgb": rgb_path,
-        "mask": mask_path,
-        "shadow": shadow_path,
-    }
+    # --- Restore previous visibility ---
+    for prop, value in prev_vis.items():
+        if hasattr(obj, prop):
+            setattr(obj, prop, value)
 
 
 # ------------------------------------------------------------
