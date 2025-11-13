@@ -117,6 +117,7 @@ def cleanup_imported_objects():
         if scene.camera.original:
             protected.add(scene.camera.original)
 
+    mesh_objs = []
     for obj in list(scene.objects):
         if obj.name == "Ground":
             continue
@@ -125,17 +126,37 @@ def cleanup_imported_objects():
         if obj.type != "MESH":
             bpy.data.objects.remove(obj, do_unlink=True)
             continue
+        mesh_objs.append(obj)
+
+    if not mesh_objs:
+        return
+
+    keep, flagged = [], []
+    for obj in mesh_objs:
         name = obj.name.lower()
         dims = obj.dimensions
         max_dim = max(dims)
         flat = dims.z < 0.01 and max(dims) > 10 * max(dims.z, 1e-4)
         tiny = max_dim < 0.05
         if any(k in name for k in HELPER_KEYWORDS) or flat or tiny:
+            flagged.append(obj)
+        else:
+            keep.append(obj)
+
+    if not keep and flagged:
+        flagged.sort(key=lambda o: o.dimensions.x * o.dimensions.y * max(o.dimensions.z, 1e-6), reverse=True)
+        salvage = flagged.pop(0)
+        keep.append(salvage)
+        print(f"ℹ️ Keeping potential helper mesh '{salvage.name}' to avoid empty scene")
+
+    for obj in flagged:
+        if obj not in keep:
             bpy.data.objects.remove(obj, do_unlink=True)
 
 def first_mesh():
     objs = [o for o in bpy.context.scene.objects if o.type == "MESH" and o.name != "Ground"]
     if not objs:
+        print("⚠️ No mesh objects available after import/cleanup")
         return None
     prim, helpers = [], []
     for o in objs:
@@ -354,7 +375,7 @@ def render_sample(model, out_dir, samples, idx):
     # ground plane
     bb = [obj.matrix_world @ Vector(c) for c in obj.bound_box]
     s = max(max(v.x for v in bb) - min(v.x for v in bb),
-            max(v.y for v in bb) - min(v.y for v in bb)) * 2
+        max(v.y for v in bb) - min(v.y for v in bb)) * 6
     bpy.ops.mesh.primitive_plane_add(size=s, location=(0, 0, 0))
     plane = bpy.context.active_object
     plane.name = "Ground"

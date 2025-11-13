@@ -6,3 +6,5 @@
 
 # Generated renders
 blendify/output/
+
+*.png
