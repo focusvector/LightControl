@@ -25,7 +25,7 @@ from mathutils import Vector
 LIGHT_RADIUS = 8.0
 IMG_RES = 1024
 MASK_MAT_NAME = "_MaskMat"
-VARIATIONS_PER_MODEL = 32
+VARIATIONS_PER_MODEL = 72
 HELPER_KEYWORDS = ("helper", "orient", "arrow", "axis", "pivot", "guide", "control")
 RECENT_LIGHT_DIRS = []
 MAX_RECENT_LIGHT_DIRS = 6
